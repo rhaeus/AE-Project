@@ -1,5 +1,6 @@
 video = VideoReader("pacman.mp4") ;
 params.M = 200 ; 
+params.pcm_colour = [255,231,55];
 params.state_space_bound = [video.Height; video.Width];
 params.Sigma_R = diag([2 2]);
 
@@ -12,11 +13,11 @@ S.W = 1/params.M * ones(1,params.M);
 %% Main LOOP %%
 while hasFrame(video) 
     vidFrame = readFrame(video); %read video frame of pacmans, class: uint8
-    histogram = color_histogram(vidFrame, pcm_colour);
+    histogram = color_histogram(vidFrame, params.pcm_colour);
     S_bar = pf_predict(S, params);
-    pf_weight(S_bar, params, histogram) ;
-    S = pf_sys_resamp(S_bar) ;
-end 
+    S_bar = pf_weight(S_bar, params, histogram) ;
+    S = pf_sys_resamp(S_bar);
+end
 
 function histogram = color_histogram(frame, colour)
 [H, W, D] = size(frame); %height, width, dimension of video frame matrix
@@ -25,19 +26,23 @@ histogram = pdist2(RGB_matrix, colour, "euclidean");
 histogram = 1./histogram ; 
 
 histogram = reshape(histogram, H, W);
-histogram_size = size(frame_proc);
+% histogram_size = size(histogram);
 % frame_proc = reshape(histogram, H, W);
 end
 
 function S_bar = pf_predict(S, params)
 N = size(S.X, 1) ;
 %Diffusion assuming uncorrelated sigma R
-S_bar.X = S.X + randn(N, params.M) .* repmat(sqrt(diag(params.Sigma_R)),1,M);
+S_bar.X = S.X + randn(N, params.M) .* repmat(sqrt(diag(params.Sigma_R)),1,params.M);
 end
 
 function S_bar = pf_weight(S_bar, params, histogram)
 for m = 1: params.M
-    S_bar.W = histogram(round(S_bar.X(1)), round(S_bar.X(2)))
+    row = round(S_bar.X(1, :)) ;
+    m_row = max(row);
+    col = round(S_bar.X(2, :)) ;
+    m_col = max(col);
+    S_bar.W(1, m) = histogram(row(m), col(m));
     
     %normalize
 end
