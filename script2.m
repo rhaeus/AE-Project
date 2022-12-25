@@ -1,5 +1,5 @@
 video = VideoReader("pacman.mp4") ;
-params.M = 200 ; 
+params.M = 1000 ; 
 params.pcm_colour = [255,231,55];
 params.state_space_bound = [video.Height; video.Width];
 params.Sigma_R = diag([2 2]);
@@ -17,6 +17,12 @@ while hasFrame(video)
     S_bar = pf_predict(S, params);
     S_bar = pf_weight(S_bar, params, histogram) ;
     S = pf_sys_resamp(S_bar);
+
+    imshow(vidFrame)
+    hold on
+    plot(S.X(1,:),S.X(2,:),'.','Color','green') %plot the particles 
+    drawnow
+    hold off
 end
 
 function histogram = color_histogram(frame, colour)
@@ -28,25 +34,40 @@ histogram = 1./histogram ;
 histogram = reshape(histogram, H, W);
 % histogram_size = size(histogram);
 % frame_proc = reshape(histogram, H, W);
+% disp("histogram filter successful")
+
 end
 
 function S_bar = pf_predict(S, params)
 N = size(S.X, 1) ;
 %Diffusion assuming uncorrelated sigma R
 S_bar.X = S.X + randn(N, params.M) .* repmat(sqrt(diag(params.Sigma_R)),1,params.M);
+% disp("pf_predict successful")
 end
 
 function S_bar = pf_weight(S_bar, params, histogram)
-for m = 1: params.M
-    row = round(S_bar.X(1, :)) ;
-    m_row = max(row);
-    col = round(S_bar.X(2, :)) ;
-    m_col = max(col);
-    S_bar.W(1, m) = histogram(row(m), col(m));
+row = ceil(S_bar.X(1, :)) ;
+col = ceil(S_bar.X(2, :)) ;
+max_width =  params.state_space_bound(2) ;
+max_height =  params.state_space_bound(1);
+if any(col > max_width) || any(row > max_height)
+    col(col>max_width) = max_width ; % columns/ width
+    row(row> max_height) = max_height ; %rows / height
+end
+for i = 1:1:params.M
+%     test1 = row(i);
+%     test2 = col(i);
+    try
+        S_bar.W(1, i) = histogram(row(i), col(i));
+    catch
+        fprintf("\nindexing error \n m= %d\n row = %d\n col= %d\n", i, row, col)
+        disp("error")
+    end
     
     %normalize
 end
-S_bar.W = S_bar.W ./sum(sum(S_bar.W)) ;
+S_bar.W = S_bar.W ./sum(S_bar.W) ;
+% disp("pf_weight successful")
 end
 
 function S = pf_sys_resamp(S_bar)
@@ -60,4 +81,6 @@ for m = 1 : M
     r_0 = r_0 + 1/M;
 end
 S.W = 1/M*ones(size(S_bar.W));
+% disp("systematic resampling successful")
+
 end
