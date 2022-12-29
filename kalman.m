@@ -7,7 +7,7 @@ params.state_space_bound = [video.Width; video.Height-100]; %1920 1080
 params.cutoff_dist = 25;
 
 xhat = [800;850]; % position
-v = 10;
+v = 30;
 
 
 A = [1 0; 0 1];
@@ -17,7 +17,7 @@ C = [1 0; 0 1];
 P = eye(2)*1; % uncertainty of position
 G = eye(2); % dim correction for process noise
 D = eye(2); % dim correction for measurement noise
-R = diag([1 1]); %process noise
+R = diag([10 10]); %process noise
 Q = diag([4 4]); % measurement noise
 
 
@@ -29,7 +29,6 @@ while hasFrame(video)
     vidFrame = readFrame(video); %read video frame of pacmans, class: uint8
 
     frame = vidFrame(1:params.state_space_bound(2),1:params.state_space_bound(1),:);
-    size(frame)
 
     % do kalman
     u = getControl();
@@ -43,10 +42,7 @@ while hasFrame(video)
 
     % Measurement update
     K = P * C' * inv(C * P * C' + D * Q * D');
-%     y
-%     size(y)
-%     bla=C*xhat
-%     size(bla)
+
     xhat = xhat + K * (y - C * xhat);
     xhat = min(max(xhat, [0;0]), params.state_space_bound);
     P = P - K * C * P;
@@ -56,6 +52,11 @@ while hasFrame(video)
     subplot(2,2,1);
     image(vidFrame,Parent=gca);
 
+    hold on
+    plot(xhat(1), xhat(2),'x','Color','green') %plot the particles 
+    drawnow
+    hold off
+
 
 
     dist = color_dist(frame, params.pcm_colour);
@@ -63,14 +64,9 @@ while hasFrame(video)
     subplot(2,2,2);
     imshow(mat2gray(bin),Parent=gca);
 
-%     
-
 %     subplot(2,2,3);
 %     imshow(vidFrame,Parent=gca)
-    hold on
-    plot(xhat(1), xhat(2),'x','Color','green') %plot the particles 
-    drawnow
-    hold off
+
 
     hold on
     plot(y(1), y(2),'x','Color','magenta') %plot the particles 
