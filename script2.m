@@ -1,16 +1,15 @@
 video = VideoReader("video/pacman.mp4") ;
-video.CurrentTime = 20;
+video.CurrentTime = 25.8;
+% video.FrameRate
 params.M = 1000 ; 
 % params.pcm_colour = [255,231,55];
 params.pcm_colour = [255,255,0];
-% params.state_space_bound = [video.Width; video.Height]; %1920 1080 
+
 params.state_space_bound = [video.Width; video.Height-100]; %1920 1080 
 params.Sigma_R = diag([400 400]);
 
 %% Variable Initialization %%
 % Initialize Sample Set
-% S.X = rand(1, params.M)*params.state_space_bound(1); % x coord of each particle in the set
-% S.Y = rand(1, params.M)*params.state_space_bound(2); % y coord of each particle in the set
 
 S.X = [rand(1, params.M)*params.state_space_bound(1); % x coord of each particle in the set
     rand(1, params.M)*params.state_space_bound(2)]; % y coord of each particle in the set
@@ -22,26 +21,18 @@ S.W = 1/params.M * ones(1,params.M);
 %% Main LOOP %%
 while hasFrame(video) 
     vidFrame = readFrame(video); %read video frame of pacmans, class: uint8
+
     histogram = calc_color_histogram(vidFrame, params.pcm_colour);
     S_bar = pf_predict(S, params);
-%     size(S_bar.X)
-%     size(S_bar.W)
     S_bar = pf_weight(S_bar, params, histogram) ;
-%     size(S_bar.X)
-%     size(S_bar.W)
+
     S = pf_sys_resamp(S_bar);
+%     S = multinomial_resample(S_bar, params);
 
 %     subplot(2,2,1);
     image(vidFrame,Parent=gca);
 % 
 %     subplot(2,2,2);
-% 
-%     grey = mat2gray(histogram);
-%     [v1, i1] = min(grey)
-%     max(max(grey))
-
-
-
 %     imshow(mat2gray(histogram),Parent=gca);
 
 %     subplot(2,2,3);
@@ -50,23 +41,15 @@ while hasFrame(video)
     plot(S.X(1,:),S.X(2,:),'.','Color','green') %plot the particles 
     drawnow
     hold off
-    pause(1)
+    pause(0.1)
 end
 
 function histogram = calc_color_histogram(frame, colour)
 [H, W, D] = size(frame); %height, width, dimension of video frame matrix
 RGB_matrix = double(reshape(frame,[H*W, D])); % create matrix with R G B values listed in separate columns
-% min(RGB_matrix)
-% max(RGB_matrix)
 histogram = pdist2(RGB_matrix, colour, "euclidean");
-% histogram = histogram + 0.01;
-% histogram = histogram ./ 255;
-% min(histogram)
-% max(histogram)
 histogram = 1./histogram ; 
-% % min(histogram)
-% max(histogram)
-histogram = histogram / sum(sum(histogram)) ;
+% histogram = histogram / sum(sum(histogram)) ;
 
 histogram = reshape(histogram, H, W);
 % histogram_size = size(histogram);
@@ -139,12 +122,27 @@ cdf = cumsum(S_bar.W);
 M = size(S_bar.X,2);
 S.X = zeros(size(S_bar.X));
 r_0 = rand / M;
+
 for m = 1 : M
     i = find(cdf >= r_0,1,'first');
+
     S.X(:,m) = S_bar.X(:,i);
     r_0 = r_0 + 1/M;
 end
 S.W = 1/M*ones(size(S_bar.W));
 % disp("systematic resampling successful")
 
+end
+
+function S = multinomial_resample(S_bar, params)
+
+    cdf = cumsum(S_bar.W);
+    S.X = zeros(size(S_bar.X));
+
+    for m = 1 : params.M
+        rm = rand;
+        i = find(cdf >= rm,1,'first');
+        S.X(:,m) = S_bar.X(:,i);
+    end
+    S.W = 1/params.M*ones(1,params.M);
 end
