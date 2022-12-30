@@ -1,12 +1,22 @@
 video = VideoReader("video/pacman.mp4") ;
-video.CurrentTime = 20;
+video.CurrentTime = 5;
 
 % params.pcm_colour = [255,231,55];
 params.pcm_colour = [255,255,0];
 params.state_space_bound = [video.Width; video.Height-100]; %1920 1080 
 params.cutoff_dist = 25;
 
-xhat = [800;850]; % position
+
+% xhat = [800;850]; % position
+% use first frame to initialize start position 
+vidFrame = readFrame(video); %read video frame of pacmans, class: uint8
+frame = vidFrame(1:params.state_space_bound(2),1:params.state_space_bound(1),:);
+dist_image = color_dist(frame, params.pcm_colour); %980x1920
+bin_image = dist_image < params.cutoff_dist;
+[r, c] = find(bin_image, 1, 'first');
+xhat = [r;c];
+
+% 'velocity' of pacman in pixel per frame
 v = 30;
 
 
@@ -91,7 +101,6 @@ function pos = doMeasurement(frame, params, x_hat)
     % with 1 as measurement of pacman position
 
     dist_image = color_dist(frame, params.pcm_colour); %980x1920
-%     dist_image = dist_image(1:params.state_space_bound(2),:);
 
     bin_image = dist_image < params.cutoff_dist;
 
@@ -101,38 +110,13 @@ function pos = doMeasurement(frame, params, x_hat)
 
     [row,col] = ind2sub([params.state_space_bound(2), params.state_space_bound(1)],nearest_nbr_idx);
 
-%     nearest_nbr_x = mod(nearest_nbr, params.state_space_bound(2));
-%     nearest_nbr_y = floor(nearest_nbr / params.state_space_bound(2));
-
-%     pos = double([nearest_nbr_y; nearest_nbr_x]);
-
     pos = [col; row];
     
-
-%     min_pos_dist = [inf;inf];
-
-%     for w = 1:params.state_space_bound(1)
-%         for h = 1:(params.state_space_bound(2) - 100)
-%     for w = 1:10
-%         for h = 1:10
-%             if bin_image(h, w) > 0
-%                 d = pdist2(x_hat, [w;h]);
-%                 if d < min_pos_dist
-%                     min_pos_dist = d;
-%                     pos = [w;h];
-%                 end
-%             end
-%         end
-%     end
-
 end
 
 function dist_mat = color_dist(frame, colour)
     [H, W, D] = size(frame); %height, width, dimension of video frame matrix
     RGB_matrix = double(reshape(frame,[H*W, D])); % create matrix with R G B values listed in separate columns
     dist_mat = pdist2(RGB_matrix, colour, "euclidean");
-%     histogram = 1./histogram ; 
-%     histogram = histogram / sum(sum(histogram)) ;
-    
     dist_mat = reshape(dist_mat, H, W);
 end
