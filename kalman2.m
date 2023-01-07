@@ -55,7 +55,7 @@ while hasFrame(video)
     K = P * C' * inv(C * P * C' + R);
 
     xhat = xhat + K * (y - C * xhat);
-    xhat = min(max(xhat, [0;0;0;0]), [params.state_space_bound ;0;0]);
+    xhat = min(max(xhat, [0;0;0;0]), [params.state_space_bound(2); params.state_space_bound(1) ;100;100]);
     P = P - K * C * P;
 
 
