@@ -35,30 +35,29 @@ while hasFrame(video)
 %     weight_avg
 %     avgs = [avgs weight_avg];
 
-    frame = vidFrame(params.bounds(1,1):params.bounds(1,2), params.bounds(2,1):params.bounds(2,2),:);
-    dist_image = color_dist(frame, params.pcm_colour); %980x1920
-    bin_image = dist_image < params.cutoff_dist;
-    pos = find(bin_image, params.random_particles, 'first'); % get positions of particles at target color
-    n = size(pos,1);
-%     pos = ind2sub([params.bounds(1,2), params.bounds(2,2)], pos);
-%     pos = ind2sub(size(bin_image), pos);
 
-    p = zeros([2 n]);
-    for i = 1 : n
-        [c,r] = ind2sub(size(bin_image), pos(i));
-        p(1,i) = r;
-        p(2,i) = c;
-    end
-%     p
-
-%     if it > warmup_it && weight_avg < 0.003
-%         display('we think we are lost, re-init')
-%         S = init(params);
-%         it = 0;
-%     else
+    if it > warmup_it && weight_avg < 0.003
+        display('we think we are lost, inject at pacman color position')
+        frame = vidFrame(params.bounds(1,1):params.bounds(1,2), params.bounds(2,1):params.bounds(2,2),:);
+        dist_image = color_dist(frame, params.pcm_colour); %980x1920
+        bin_image = dist_image < params.cutoff_dist;
+        pos = find(bin_image, params.random_particles, 'first'); % get positions of particles at target color
+        n = size(pos,1);
+    %     pos = ind2sub([params.bounds(1,2), params.bounds(2,2)], pos);
+    %     pos = ind2sub(size(bin_image), pos);
+    
+        p = zeros([2 n]);
+        for i = 1 : n
+            [c,r] = ind2sub(size(bin_image), pos(i));
+            p(1,i) = r;
+            p(2,i) = c;
+        end
         S = pf_sys_resamp(S_bar, params, p);
+        it = 0;
+    else
+        S = pf_sys_resamp(S_bar, params, []);
         % S = multinomial_resample(S_bar, params);
-%     end
+    end
 
 
 
@@ -217,10 +216,12 @@ function S = pf_sys_resamp(S_bar, params, random_particles)
     % disp("systematic resampling successful")
     
     % inject random particles
-    for i = 1 : size(random_particles, 2)
-        index = randi([1, params.M]);
-    %     index = i;
-        S.X(:, index) = random_particles(:,i);
+    if ~isempty(random_particles)
+        for i = 1 : size(random_particles, 2)
+            index = randi([1, params.M]);
+        %     index = i;
+            S.X(:, index) = random_particles(:,i);
+        end
     end
 
 end
