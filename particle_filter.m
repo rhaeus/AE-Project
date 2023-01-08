@@ -1,5 +1,9 @@
+startTime = 29;
+stopTime = 31;
+
 video = VideoReader("video/pacman.mp4") ;
-video.CurrentTime = 25.8;
+video.CurrentTime = startTime;
+
 % video.FrameRate
 params.M = 1000 ; 
 % params.pcm_colour = [255,231,55];
@@ -20,14 +24,21 @@ S.X = [rand(1, params.M)*params.state_space_bound(1); % x coord of each particle
 % Initialize Weights
 S.W = 1/params.M * ones(1,params.M); 
 
+weight_avgs = [];
+pos_estimates = [];
+pos_groundtruths = [];
+pos_errs = [];
+particle_stddevs = [];
+time = [];
+
 
 %% Main LOOP %%
-while hasFrame(video) 
+while hasFrame(video) && video.CurrentTime < stopTime
     vidFrame = readFrame(video); %read video frame of pacmans, class: uint8
 
     histogram = color_histogram(vidFrame, params.pcm_colour);
     S_bar = pf_predict(S, params);
-    S_bar = pf_weight(S_bar, params, histogram) ;
+    [S_bar, weight_avg] = pf_weight(S_bar, params, histogram);
 
     S = pf_sys_resamp(S_bar);
 %     S = multinomial_resample(S_bar, params);
@@ -40,13 +51,22 @@ while hasFrame(video)
 
 %     subplot(2,2,3);
     imshow(vidFrame,Parent=gca)
-    plot_particles(S);
+    pos_estimate = plot_particles(S);
+    pos_groundtruth = plot_pacman_center(vidFrame, params);
 
-    plot_pacman_center(vidFrame, params);
+    time = [time video.CurrentTime];
+    weight_avgs = [weight_avgs weight_avg];
+    pos_estimates = [pos_estimates pos_estimate];
+    pos_groundtruths = [pos_groundtruths pos_groundtruth];
+    pos_err = norm(pos_estimate - pos_groundtruth);
+    pos_errs = [pos_errs pos_err];
+    stddev = [std(S.X(1,:)); std(S.X(2,:))];
+    particle_stddevs = [particle_stddevs stddev];
 
     pause(0.1)
 end
 
+pf_plot_stats(time,weight_avgs, pos_estimates, pos_groundtruths, pos_errs, particle_stddevs);
 
 function S_bar = pf_predict(S, params)
 N = size(S.X, 1) ;
@@ -56,31 +76,31 @@ S_bar.W = S.W;
 % disp("pf_predict successful")
 end
 
-% histogram 1080x1920
-% S.W 1xM
-% S.X 2x1000
-function S_bar = pf_weight(S, params, histogram)
-    S_bar = S;
-    x_coords = ceil(S_bar.X(1, :)) ; % 1x1000
-    y_coords = ceil(S_bar.X(2, :)) ; % 1x1000
-
-    max_width =  params.state_space_bound(1) ;
-    max_height =  params.state_space_bound(2);
-
-    for m=1:params.M
-        x = x_coords(1,m);
-        y = y_coords(1,m);
-
-        if (x > max_width || x <= 0 || y > max_height || y <= 0)
-            S_bar.W(m) = 0;
-        else
-            S_bar.W(m) = histogram(y, x);
-        end
-    end
-
-    % normalize weights
-    S_bar.W = S_bar.W ./ sum(S_bar.W) ;
-end
+% % histogram 1080x1920
+% % S.W 1xM
+% % S.X 2x1000
+% function S_bar = pf_weight(S, params, histogram)
+%     S_bar = S;
+%     x_coords = ceil(S_bar.X(1, :)) ; % 1x1000
+%     y_coords = ceil(S_bar.X(2, :)) ; % 1x1000
+% 
+%     max_width =  params.state_space_bound(1) ;
+%     max_height =  params.state_space_bound(2);
+% 
+%     for m=1:params.M
+%         x = x_coords(1,m);
+%         y = y_coords(1,m);
+% 
+%         if (x > max_width || x <= 0 || y > max_height || y <= 0)
+%             S_bar.W(m) = 0;
+%         else
+%             S_bar.W(m) = histogram(y, x);
+%         end
+%     end
+% 
+%     % normalize weights
+%     S_bar.W = S_bar.W ./ sum(S_bar.W) ;
+% end
 
 % function S_bar = pf_weight(S_bar, params, histogram)
 % row = ceil(S_bar.X(1, :)) ;
