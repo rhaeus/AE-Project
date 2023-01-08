@@ -44,7 +44,7 @@ while hasFrame(video)
 %     u = getControl();
     % Prediction
     xhat = A * xhat;
-%     xhat = min(max(xhat, [0;0]), params.state_space_bound);
+    xhat = min(max(xhat, [0;0;0;0]), [params.state_space_bound(2); params.state_space_bound(1) ;100;100]); %implement clipping a second time
     P = A * P * A' + Q; %add process noise
 
     % measurement
