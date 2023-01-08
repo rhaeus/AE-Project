@@ -4,6 +4,7 @@ video.CurrentTime = 5;
 params.pcm_colour = [255,231,55];
 % params.pcm_colour = [255,255,0];
 params.state_space_bound = [video.Width; video.Height-100]; %1920 1080 
+params.bounds = [1, video.Height - 100; 1, video.Width]; % height bounds; width bounds
 params.cutoff_dist = 25;
 
 
@@ -60,29 +61,31 @@ while hasFrame(video)
 
 
 
-    subplot(2,2,1);
+%     subplot(2,2,1);
     image(vidFrame,Parent=gca);
 
     hold on
-    plot(xhat(2), xhat(1),'x','Color','green') %plot the particles 
+    plot(xhat(2), xhat(1),'x','Color','red','MarkerSize', 10, 'LineWidth', 5) %plot the estimate 
     drawnow
     hold off
 
+    plot_pacman_center(vidFrame, params);
 
 
-    dist = color_dist(frame, params.pcm_colour);
-    bin = dist < params.cutoff_dist;
-    subplot(2,2,2);
-    imshow(mat2gray(bin),Parent=gca);
+
+%     dist = color_dist(frame, params.pcm_colour);
+%     bin = dist < params.cutoff_dist;
+%     subplot(2,2,2);
+%     imshow(mat2gray(bin),Parent=gca);
 
 %     subplot(2,2,3);
 %     imshow(vidFrame,Parent=gca)
 
 
-    hold on
-    plot(y(2), y(1),'x','Color','magenta') %plot the particles 
-    drawnow
-    hold off
+%     hold on
+%     plot(y(2), y(1),'x','Color','magenta') %plot the particles 
+%     drawnow
+%     hold off
 
 
 
@@ -114,11 +117,4 @@ function pos = doMeasurement(frame, params, x_hat)
 
     pos = [row; col]; %pos = [x, y] = [col, row]
     
-end
-
-function dist_mat = color_dist(frame, colour)
-    [H, W, D] = size(frame); %height, width, dimension of video frame matrix
-    RGB_matrix = double(reshape(frame,[H*W, D])); % create matrix with R G B values listed in separate columns
-    dist_mat = pdist2(RGB_matrix, colour, "euclidean");
-    dist_mat = reshape(dist_mat, H, W);
 end

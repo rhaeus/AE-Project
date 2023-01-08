@@ -9,6 +9,8 @@ params.pcm_colour = [255,255,0];
 params.bounds = [100, 1000;450, 1450]; % height bounds; width bounds
 params.Sigma_R = diag([400 400]);
 
+params.cutoff_dist = 25;
+
 %% Variable Initialization %%
 % Initialize Sample Set
 
@@ -47,15 +49,15 @@ while hasFrame(video)
 
 %     subplot(2,2,3);
     imshow(vidFrame,Parent=gca)
-    hold on
-    plot(S.X(1,:),S.X(2,:),'.','Color','green') %plot the particles 
-    drawnow
-    hold off
+    plot_particles(S);
+    % FIXME: ugly hack to make pacman center position work
+    % look into how to make this work with original bounds in the find
+    % funtion
+    bounds = params.bounds;
+    params.bounds = [1, video.Height - 100; 1, video.Width]; % height bounds; width bounds
+    plot_pacman_center(vidFrame, params);
+    params.bounds = bounds;
 
-    hold on
-    plot(mean(S.X(1,:)),mean(S.X(2,:)),'x','Color','red') %plot the particles avg 
-    drawnow
-    hold off
 
 %     hold on
 %     plot(params.bounds(2,1), params.bounds(1,1),'x','Color','yellow') %plot the particles avg 

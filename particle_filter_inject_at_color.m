@@ -28,7 +28,7 @@ while hasFrame(video)
     vidFrame = readFrame(video); %read video frame of pacmans, class: uint8
 %     video.CurrentTime
 
-    histogram = calc_color_histogram(vidFrame, params.pcm_colour);
+    histogram = color_histogram(vidFrame, params.pcm_colour);
     S_bar = pf_predict(S, params);
     [S_bar, weight_avg] = pf_weight(S_bar, params, histogram);
 
@@ -38,20 +38,8 @@ while hasFrame(video)
 
     if it > warmup_it && weight_avg < 0.003
         display('we think we are lost, inject at pacman color position')
-        frame = vidFrame(params.bounds(1,1):params.bounds(1,2), params.bounds(2,1):params.bounds(2,2),:);
-        dist_image = color_dist(frame, params.pcm_colour); %980x1920
-        bin_image = dist_image < params.cutoff_dist;
-        pos = find(bin_image, params.random_particles, 'first'); % get positions of particles at target color
-        n = size(pos,1);
-    %     pos = ind2sub([params.bounds(1,2), params.bounds(2,2)], pos);
-    %     pos = ind2sub(size(bin_image), pos);
-    
-        p = zeros([2 n]);
-        for i = 1 : n
-            [c,r] = ind2sub(size(bin_image), pos(i));
-            p(1,i) = r;
-            p(2,i) = c;
-        end
+
+        p = find_pacman_positions(vidFrame, params);
         S = pf_sys_resamp(S_bar, params, p);
         it = 0;
     else
@@ -69,31 +57,14 @@ while hasFrame(video)
 
 %     subplot(2,2,3);
     imshow(vidFrame,Parent=gca)
-    hold on
-    plot(S.X(1,:),S.X(2,:),'.','Color','green') %plot the particles 
-    drawnow
-    hold off
+    plot_particles(S);
 
-    hold on
-    plot(mean(S.X(1,:)),mean(S.X(2,:)),'x','Color','red') %plot the particles avg 
-    drawnow
-    hold off
+    plot_pacman_center(vidFrame, params);
 
 %     subplot(1,2,2);
 %     plot(avgs);
 
-%     hold on
-%     plot(params.bounds(2,1), params.bounds(1,1),'x','Color','yellow') %plot the particles avg 
-%     drawnow
-%     hold off
     pause(0.2)
-end
-
-function dist_mat = color_dist(frame, colour)
-    [H, W, D] = size(frame); %height, width, dimension of video frame matrix
-    RGB_matrix = double(reshape(frame,[H*W, D])); % create matrix with R G B values listed in separate columns
-    dist_mat = pdist2(RGB_matrix, colour, "euclidean");
-    dist_mat = reshape(dist_mat, H, W);
 end
 
 function pos = getRandomPos(params, count)
@@ -121,19 +92,7 @@ function S = init(params)
     % pause(10)
 end
 
-function histogram = calc_color_histogram(frame, colour)
-[H, W, D] = size(frame); %height, width, dimension of video frame matrix
-RGB_matrix = double(reshape(frame,[H*W, D])); % create matrix with R G B values listed in separate columns
-histogram = pdist2(RGB_matrix, colour, "euclidean");
-histogram = 1./histogram ; 
-% histogram = histogram / sum(sum(histogram)) ;
 
-histogram = reshape(histogram, H, W);
-% histogram_size = size(histogram);
-% frame_proc = reshape(histogram, H, W);
-% disp("histogram filter successful")
-
-end
 
 function S_bar = pf_predict(S, params)
 N = size(S.X, 1) ;
@@ -237,11 +196,4 @@ function S = multinomial_resample(S_bar, params)
         S.X(:,m) = S_bar.X(:,i);
     end
     S.W = 1/params.M*ones(1,params.M);
-
-    % inject random particles
-    for i = 1 : params.random_particles
-        index = randi([1, params.M]);
-        pos = getRandomPos(params);
-        S.X(:, index) = pos;
-    end
 end

@@ -6,7 +6,10 @@ params.M = 1000 ;
 params.pcm_colour = [255,255,0];
 
 params.state_space_bound = [video.Width; video.Height-100]; %1920 1080 
+params.bounds = [1, video.Height - 100; 1, video.Width]; % height bounds; width bounds
 params.Sigma_R = diag([400 400]);
+
+params.cutoff_dist = 25;
 
 %% Variable Initialization %%
 % Initialize Sample Set
@@ -22,7 +25,7 @@ S.W = 1/params.M * ones(1,params.M);
 while hasFrame(video) 
     vidFrame = readFrame(video); %read video frame of pacmans, class: uint8
 
-    histogram = calc_color_histogram(vidFrame, params.pcm_colour);
+    histogram = color_histogram(vidFrame, params.pcm_colour);
     S_bar = pf_predict(S, params);
     S_bar = pf_weight(S_bar, params, histogram) ;
 
@@ -37,26 +40,13 @@ while hasFrame(video)
 
 %     subplot(2,2,3);
     imshow(vidFrame,Parent=gca)
-    hold on
-    plot(S.X(1,:),S.X(2,:),'.','Color','green') %plot the particles 
-    drawnow
-    hold off
+    plot_particles(S);
+
+    plot_pacman_center(vidFrame, params);
+
     pause(0.1)
 end
 
-function histogram = calc_color_histogram(frame, colour)
-[H, W, D] = size(frame); %height, width, dimension of video frame matrix
-RGB_matrix = double(reshape(frame,[H*W, D])); % create matrix with R G B values listed in separate columns
-histogram = pdist2(RGB_matrix, colour, "euclidean");
-histogram = 1./histogram ; 
-% histogram = histogram / sum(sum(histogram)) ;
-
-histogram = reshape(histogram, H, W);
-% histogram_size = size(histogram);
-% frame_proc = reshape(histogram, H, W);
-% disp("histogram filter successful")
-
-end
 
 function S_bar = pf_predict(S, params)
 N = size(S.X, 1) ;
