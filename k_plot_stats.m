@@ -1,4 +1,4 @@
-function pf_plot_stats(time, weight_avgs, pos_estimates, pos_groundtruths, pos_errs, particle_stddevs)
+function k_plot_stats(time, pos_estimates, pos_groundtruths, pos_errs, meas, meas_predict)
     mse = immse(pos_estimates,pos_groundtruths);
     fprintf('The mean-squared error is %0.4f\n', mse);
 
@@ -6,14 +6,9 @@ function pf_plot_stats(time, weight_avgs, pos_estimates, pos_groundtruths, pos_e
     mse = immse(pos_estimates(i:end),pos_groundtruths(i:end));
     fprintf('The mean-squared error after convergence is %0.4f\n', mse);
 
-    figure('Name','Weight Average');
-    plot(time, weight_avgs);
-    title('Weight average');
-    xlabel('Time (s)');
-
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-    figure('Name','Postion');
+    figure('Name','Position');
     subplot(2,1,1)
     plot(time, pos_estimates(1,:));
     hold on
@@ -42,21 +37,14 @@ function pf_plot_stats(time, weight_avgs, pos_estimates, pos_groundtruths, pos_e
     title('Position error');
     xlabel('Time (s)');
 
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-    figure('Name','Particle Standard Deviation');
-    subplot(2,1,1)
-    plot(time, particle_stddevs(1,:));
-    
-    title('X Standard Deviation');
+    figure('Name','Innovation');
+    innovation = (meas - meas_predict);
+    plot(time, innovation);
+
+    title('Innovation');
     xlabel('Time (s)');
-
-    subplot(2,1,2)
-    plot(time, particle_stddevs(2,:))
-
-    title('Y Standard Deviation');
-    xlabel('Time (s)');
-
 
 
 end

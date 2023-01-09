@@ -1,8 +1,10 @@
-video = VideoReader("pacman.mp4") ;
-video.CurrentTime = 5;
+startTime = 5;
+stopTime = 29;
 
-params.pcm_colour = [255,231,55];
-% params.pcm_colour = [255,255,0];
+video = VideoReader("video/pacman.mp4") ;
+video.CurrentTime = startTime;
+% params.pcm_colour = [255,231,55];
+params.pcm_colour = [255,255,0];
 params.state_space_bound = [video.Width; video.Height-100]; %1920 1080 
 params.bounds = [1, video.Height - 100; 1, video.Width]; % height bounds; width bounds
 params.cutoff_dist = 25;
@@ -34,9 +36,15 @@ Q = [Q_x*delta_t, eye(2)*0 ; eye(2)*0, Q_v*delta_t]; % process noise moition mod
 C = [1 0 0 0; 0 1 0 0 ;0 0 0 0 ; 0 0 0 0] ; 
 R = eye(4)*2; %sensor noise
 
+pos_estimates = [];
+pos_groundtruths = [];
+pos_errs = [];
+meas = [];
+meas_predict = [];
+time = [];
 
 %% Main LOOP %%
-while hasFrame(video) 
+while hasFrame(video) && video.CurrentTime < stopTime
     vidFrame = readFrame(video); %read video frame of pacmans, class: uint8
 
     frame = vidFrame(1:params.state_space_bound(2),1:params.state_space_bound(1),:); %height, width, so y, x
@@ -45,18 +53,25 @@ while hasFrame(video)
 %     u = getControl();
     % Prediction
     xhat = A * xhat;
-    xhat = min(max(xhat, [0;0;0;0]), [params.state_space_bound(2); params.state_space_bound(1) ;100;100]); %implement clipping a second time
+    xhat = min(max(xhat, [1;1;0;0]), [params.state_space_bound(1); params.state_space_bound(2) ;100;100]); %implement clipping a second time
     P = A * P * A' + Q; %add process noise
 
     % measurement
-    y = doMeasurement(frame, params, xhat(1:2, :));
+%     y = doMeasurement(frame, params, xhat(1:2, :));
+%     y = get_pacman_center(frame, params);
+    x = [xhat(1); xhat(2)];
+    y = get_nearest_color_pos(frame, params, x);
+%     y = get_min_color_dist_pos(frame,params);
+
     y = [y ; 0 ; 0] ; % correct dimension
+
+    yhat = C*xhat;
 
     % Measurement update
     K = P * C' * inv(C * P * C' + R);
 
     xhat = xhat + K * (y - C * xhat);
-    xhat = min(max(xhat, [0;0;0;0]), [params.state_space_bound(2); params.state_space_bound(1) ;100;100]);
+    xhat = min(max(xhat, [1;1;0;0]), [params.state_space_bound(1); params.state_space_bound(2) ;100;100]);
     P = P - K * C * P;
 
 
@@ -65,11 +80,22 @@ while hasFrame(video)
     image(vidFrame,Parent=gca);
 
     hold on
-    plot(xhat(2), xhat(1),'x','Color','red','MarkerSize', 10, 'LineWidth', 5) %plot the estimate 
+    plot(xhat(1), xhat(2),'x','Color','red','MarkerSize', 10, 'LineWidth', 5) %plot the estimate 
     drawnow
     hold off
 
-    plot_pacman_center(vidFrame, params);
+    pos_groundtruth = plot_pacman_center(vidFrame, params);
+    x = [xhat(1); xhat(2)]; 
+
+
+    time = [time video.CurrentTime];
+    pos_estimates = [pos_estimates x];
+    pos_groundtruths = [pos_groundtruths pos_groundtruth];
+    pos_err = norm(x - pos_groundtruth);
+    pos_errs = [pos_errs pos_err];
+    meas = [meas y];
+    meas_predict = [meas_predict yhat];
+
 
 
 
@@ -89,8 +115,10 @@ while hasFrame(video)
 
 
 
-    pause(0.5)
+%     pause(0.5)
 end
+
+k_plot_stats(time, pos_estimates, pos_groundtruths, pos_errs, meas, meas_predict);
 
 function u = getControl()
 %randomly select control
