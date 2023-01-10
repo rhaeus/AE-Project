@@ -1,12 +1,25 @@
-startTime = 5;
-stopTime = 29;
+clc
+clear all
+close all
 
-video = VideoReader("video/pacman.mp4") ;
+start = 50.5;
+video = VideoReader("video/pacman_full.mp4") ;
+params.Sigma_R = diag([20 20]);
+
+% start = 5;
+% video = VideoReader("video/pacman.mp4") ;
+% params.Sigma_R = diag([200 200]);
+
+startTime = start;
+stopTime = start + 25;
 video.CurrentTime = startTime;
+
+bottom_cut = video.Height / 15;
+
 % params.pcm_colour = [255,231,55];
 params.pcm_colour = [255,255,0];
-params.state_space_bound = [video.Width; video.Height-100]; %1920 1080 
-params.bounds = [1, video.Height - 100; 1, video.Width]; % height bounds; width bounds
+params.state_space_bound = [video.Width; video.Height-bottom_cut]; %1920 1080 
+params.bounds = [1, video.Height - bottom_cut; 1, video.Width]; % height bounds; width bounds
 params.cutoff_dist = 25;
 
 
@@ -34,7 +47,7 @@ Q_x = eye(2)*2; % process noise position
 Q_v = eye(2)*2; % processs noise velocity
 Q = [Q_x*delta_t, eye(2)*0 ; eye(2)*0, Q_v*delta_t]; % process noise moition model
 C = [1 0 0 0; 0 1 0 0 ;0 0 0 0 ; 0 0 0 0] ; 
-R = eye(4)*2; %sensor noise
+R = eye(4)*0.1; %sensor noise
 
 pos_estimates = [];
 pos_groundtruths = [];
@@ -42,6 +55,8 @@ pos_errs = [];
 meas = [];
 meas_predict = [];
 time = [];
+Px = [];
+Py = [];
 
 %% Main LOOP %%
 while hasFrame(video) && video.CurrentTime < stopTime
@@ -53,14 +68,14 @@ while hasFrame(video) && video.CurrentTime < stopTime
 %     u = getControl();
     % Prediction
     xhat = A * xhat;
-    xhat = min(max(xhat, [1;1;0;0]), [params.state_space_bound(1); params.state_space_bound(2) ;100;100]); %implement clipping a second time
+    xhat = min(max(xhat, [1;1;-100;-100]), [params.state_space_bound(1); params.state_space_bound(2) ;100;100]); %implement clipping a second time
     P = A * P * A' + Q; %add process noise
 
     % measurement
 %     y = doMeasurement(frame, params, xhat(1:2, :));
-%     y = get_pacman_center(frame, params);
-    x = [xhat(1); xhat(2)];
-    y = get_nearest_color_pos(frame, params, x);
+    y = get_pacman_center(frame, params);
+%     x = [xhat(1); xhat(2)];
+%     y = get_nearest_color_pos(frame, params, x);
 %     y = get_min_color_dist_pos(frame,params);
 
     y = [y ; 0 ; 0] ; % correct dimension
@@ -71,7 +86,7 @@ while hasFrame(video) && video.CurrentTime < stopTime
     K = P * C' * inv(C * P * C' + R);
 
     xhat = xhat + K * (y - C * xhat);
-    xhat = min(max(xhat, [1;1;0;0]), [params.state_space_bound(1); params.state_space_bound(2) ;100;100]);
+    xhat = min(max(xhat, [1;1;-100;-100]), [params.state_space_bound(1); params.state_space_bound(2) ;100;100]);
     P = P - K * C * P;
 
 
@@ -95,6 +110,8 @@ while hasFrame(video) && video.CurrentTime < stopTime
     pos_errs = [pos_errs pos_err];
     meas = [meas y];
     meas_predict = [meas_predict yhat];
+    Px = [Px P(1,1)];
+    Py = [Py P(2,2)];
 
 
 
@@ -115,10 +132,10 @@ while hasFrame(video) && video.CurrentTime < stopTime
 
 
 
-%     pause(0.5)
+    pause(0.05)
 end
 
-k_plot_stats(time, pos_estimates, pos_groundtruths, pos_errs, meas, meas_predict);
+k_plot_stats(time, pos_estimates, pos_groundtruths, pos_errs, meas, meas_predict, Px, Py);
 
 function u = getControl()
 %randomly select control
