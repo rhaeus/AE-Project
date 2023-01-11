@@ -1,8 +1,23 @@
-startTime = 29;
-stopTime = 31;
+% Particle filter that detects kidnap event through weight average and then
+% re-initializes the filter
 
-video = VideoReader("video/pacman.mp4") ;
+clc
+clear all
+close all
+
+start = 50.5;
+video = VideoReader("video/pacman_full.mp4") ;
+params.Sigma_R = diag([20 20]);
+
+% start = 5;
+% video = VideoReader("video/pacman.mp4") ;
+% params.Sigma_R = diag([200 200]);
+
+startTime = start + 25;
+stopTime = start + 30;
 video.CurrentTime = startTime;
+
+bottom_cut = video.Height / 15;
 
 % video.FrameRate
 params.M = 1000 ; 
@@ -10,8 +25,10 @@ params.M = 1000 ;
 params.pcm_colour = [255,255,0];
 
 % params.state_space_bound = [video.Width; video.Height-100]; %1920 1080 
-params.bounds = [1, video.Height - 100; 1, video.Width]; % height bounds; width bounds
-params.Sigma_R = diag([400 400]);
+params.bounds = [1, video.Height - bottom_cut; 1, video.Width]; % height bounds; width bounds
+% params.Sigma_R = diag([400 400]);
+
+params.cutoff_dist = 25;
 
 %% Variable Initialization %%
 S = init(params);
@@ -84,7 +101,7 @@ while hasFrame(video) && video.CurrentTime < stopTime
 %     plot(params.bounds(2,1), params.bounds(1,1),'x','Color','yellow') %plot the particles avg 
 %     drawnow
 %     hold off
-    pause(0.5)
+%     pause(0.5)
 end
 
 pf_plot_stats(time,weight_avgs, pos_estimates, pos_groundtruths, pos_errs, particle_stddevs);
@@ -121,56 +138,6 @@ S_bar.W = S.W;
 % disp("pf_predict successful")
 end
 
-% % histogram 1080x1920
-% % S.W 1xM
-% % S.X 2x1000
-% function [S_bar, w_avg] = pf_weight(S, params, histogram)
-%     S_bar = S;
-%     x_coords = ceil(S_bar.X(1, :)) ; % 1x1000
-%     y_coords = ceil(S_bar.X(2, :)) ; % 1x1000
-% 
-% 
-%     for m=1:params.M
-%         x = x_coords(1,m);
-%         y = y_coords(1,m);
-% 
-%         if (x > params.bounds(2,2) || x <= params.bounds(2,1) || y > params.bounds(1,2) || y <= params.bounds(1,1))
-%             S_bar.W(m) = 0;
-%         else
-%             S_bar.W(m) = histogram(y, x);
-%         end
-%     end
-% 
-%     w_avg = mean(S_bar.W);
-% 
-%     % normalize weights
-%     S_bar.W = S_bar.W ./ sum(S_bar.W) ;
-% end
-
-% function S_bar = pf_weight(S_bar, params, histogram)
-% row = ceil(S_bar.X(1, :)) ;
-% col = ceil(S_bar.X(2, :)) ;
-% max_width =  params.state_space_bound(2) ;
-% max_height =  params.state_space_bound(1);
-% if any(col > max_width) || any(row > max_height)
-%     col(col>max_width) = max_width ; % columns/ width
-%     row(row> max_height) = max_height ; %rows / height
-% end
-% for i = 1:1:params.M
-% %     test1 = row(i);
-% %     test2 = col(i);
-%     try
-%         S_bar.W(1, i) = histogram(row(i), col(i));
-%     catch
-%         fprintf("\nindexing error \n m= %d\n row = %d\n col= %d\n", i, row, col)
-%         disp("error")
-%     end
-%     
-%     %normalize
-% end
-% S_bar.W = S_bar.W ./sum(S_bar.W) ;
-% % disp("pf_weight successful")
-% end
 
 function S = pf_sys_resamp(S_bar)
 cdf = cumsum(S_bar.W);
@@ -189,15 +156,15 @@ S.W = 1/M*ones(size(S_bar.W));
 
 end
 
-function S = multinomial_resample(S_bar, params)
-
-    cdf = cumsum(S_bar.W);
-    S.X = zeros(size(S_bar.X));
-
-    for m = 1 : params.M
-        rm = rand;
-        i = find(cdf >= rm,1,'first');
-        S.X(:,m) = S_bar.X(:,i);
-    end
-    S.W = 1/params.M*ones(1,params.M);
-end
+% function S = multinomial_resample(S_bar, params)
+% 
+%     cdf = cumsum(S_bar.W);
+%     S.X = zeros(size(S_bar.X));
+% 
+%     for m = 1 : params.M
+%         rm = rand;
+%         i = find(cdf >= rm,1,'first');
+%         S.X(:,m) = S_bar.X(:,i);
+%     end
+%     S.W = 1/params.M*ones(1,params.M);
+% end

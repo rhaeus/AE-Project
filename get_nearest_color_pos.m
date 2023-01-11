@@ -1,10 +1,9 @@
+% calc distance of each pixel in RGB space to target color
+% mark each pixel with distance greater than cutoff as 0, others as 1
+% nearest neighbor: use position of nearest pixel  to xhat with color marked
+% with 1 as measurement of pacman position
 
 function pos = get_nearest_color_pos(frame, params, x_hat)
-    % calc distance of each pixel in RGB space to target color
-    % mark each pixel with distance greater than cutoff as 0, others as 1
-    % nearest neighbor: use position of nearest pixel with color marked
-    % with 1 as measurement of pacman position
-
     dist_image = color_dist(frame, params.pcm_colour); %980x1920
 
     bin_image = dist_image < params.cutoff_dist;

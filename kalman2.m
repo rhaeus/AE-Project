@@ -1,3 +1,5 @@
+%Kalman filter variant 2
+
 clc
 clear all
 close all
@@ -21,6 +23,10 @@ params.pcm_colour = [255,255,0];
 params.state_space_bound = [video.Width; video.Height-bottom_cut]; %1920 1080 
 params.bounds = [1, video.Height - bottom_cut; 1, video.Width]; % height bounds; width bounds
 params.cutoff_dist = 25;
+
+video_writer = VideoWriter("k2.avi"); %create the video object
+video_writer.FrameRate = video.FrameRate;
+open(video_writer); %open the file for writing
 
 
 % xhat = [800;850]; % position
@@ -47,7 +53,7 @@ Q_x = eye(2)*2; % process noise position
 Q_v = eye(2)*2; % processs noise velocity
 Q = [Q_x*delta_t, eye(2)*0 ; eye(2)*0, Q_v*delta_t]; % process noise moition model
 C = [1 0 0 0; 0 1 0 0 ;0 0 0 0 ; 0 0 0 0] ; 
-R = eye(4)*0.1; %sensor noise
+R = eye(4)*1; %sensor noise
 
 pos_estimates = [];
 pos_groundtruths = [];
@@ -72,7 +78,6 @@ while hasFrame(video) && video.CurrentTime < stopTime
     P = A * P * A' + Q; %add process noise
 
     % measurement
-%     y = doMeasurement(frame, params, xhat(1:2, :));
     y = get_pacman_center(frame, params);
 %     x = [xhat(1); xhat(2)];
 %     y = get_nearest_color_pos(frame, params, x);
@@ -92,15 +97,19 @@ while hasFrame(video) && video.CurrentTime < stopTime
 
 
 %     subplot(2,2,1);
-    image(vidFrame,Parent=gca);
+    imshow(vidFrame,Parent=gca);
 
     hold on
-    plot(xhat(1), xhat(2),'x','Color','red','MarkerSize', 10, 'LineWidth', 5) %plot the estimate 
+    plot(xhat(1), xhat(2),'x','Color','red','MarkerSize', 10, 'LineWidth', 3) %plot the estimate 
     drawnow
     hold off
 
-    pos_groundtruth = plot_pacman_center(vidFrame, params);
+    pos_groundtruth = get_pacman_center(vidFrame, params);
+%     plot_pacman_center(vidFrame, params);
     x = [xhat(1); xhat(2)]; 
+
+    F = getframe(gcf);
+    writeVideo(video_writer,F); % Write the image to file.
 
 
     time = [time video.CurrentTime];
@@ -132,34 +141,9 @@ while hasFrame(video) && video.CurrentTime < stopTime
 
 
 
-    pause(0.05)
+%     pause(0.05)
 end
-
+close(video_writer);
 k_plot_stats(time, pos_estimates, pos_groundtruths, pos_errs, meas, meas_predict, Px, Py);
 
-function u = getControl()
-%randomly select control
-    us = [[1;0], [0;1], [-1;0], [0;-1]]; %down, right, up, left
-    i = randi([1,4],1);
-    u = us(:,i); 
-end
 
-function pos = doMeasurement(frame, params, x_hat)
-    % calc distance of each pixel in RGB space to target color
-    % mark each pixel with distance greater than cutoff as 0, others as 1
-    % nearest neighbor: use position of nearest pixel with color marked
-    % with 1 as measurement of pacman position
-
-    dist_image = color_dist(frame, params.pcm_colour); %980x1920
-
-    bin_image = dist_image < params.cutoff_dist;
-
-    [D,idx] = bwdist(bin_image); % idx 980x1920, euclidean distance of the binary image
-
-    nearest_nbr_idx = idx(floor(x_hat(1)), floor(x_hat(2)));
-
-    [row,col] = ind2sub([params.state_space_bound(2), params.state_space_bound(1)],nearest_nbr_idx); %width, height // col, row
-
-    pos = [row; col]; %pos = [x, y] = [col, row]
-    
-end

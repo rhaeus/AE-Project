@@ -1,11 +1,4 @@
 function k_plot_stats(time, pos_estimates, pos_groundtruths, pos_errs, meas, meas_predict, Px, Py)
-%     mse = immse(pos_estimates,pos_groundtruths);
-%     fprintf('The mean-squared error is %0.4f\n', mse);
-% 
-%     i = find(pos_errs < 30 ,1,'first');
-%     mse = immse(pos_estimates(i:end),pos_groundtruths(i:end));
-%     fprintf('The mean-squared error after convergence is %0.4f\n', mse);
-
     err = pos_groundtruths - pos_estimates;
 
     maex = mean(abs(err(1,:)));

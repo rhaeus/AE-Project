@@ -1,9 +1,29 @@
-startTime = 29;
-stopTime = 31;
+% Particle filter that detects kidnap event through weight average and then
+% injects particles at position with color similar to pacman color
 
-video = VideoReader("video/pacman.mp4") ;
+clc
+clear all
+close all
+
+start = 50.5;
+video = VideoReader("video/pacman_full.mp4") ;
+params.Sigma_R = diag([50 50]);
+
+% start = 5;
+% video = VideoReader("video/pacman.mp4") ;
+% params.Sigma_R = diag([200 200]);
+
+startTime = start + 20;
+stopTime = start + 40;
 video.CurrentTime = startTime;
 
+
+video_writer = VideoWriter("pf_inject_at_color.avi"); %create the video object
+video_writer.FrameRate = video.FrameRate;
+open(video_writer); %open the file for writing
+
+bottom_cut = video.Height / 15;
+% bottom_cut = 0;
 
 % video.FrameRate
 params.M = 1000 ; 
@@ -11,12 +31,13 @@ params.M = 1000 ;
 params.pcm_colour = [255,255,0];
 
 % params.state_space_bound = [video.Width; video.Height-100]; %1920 1080 
-params.bounds = [1, video.Height - 100; 1, video.Width]; % height bounds; width bounds
-params.Sigma_R = diag([400 400]);
+params.bounds = [1, video.Height - bottom_cut; 1, video.Width]; % height bounds; width bounds
+
 
 params.cutoff_dist = 25;
 
 params.random_particles = 10;
+
 
 %% Variable Initialization %%
 S = init(params);
@@ -31,19 +52,30 @@ pos_errs = [];
 particle_stddevs = [];
 time = [];
 
+mins = [];
+maxs = [];
+i = 1;
 
 %% Main LOOP %%
 while hasFrame(video) && video.CurrentTime < stopTime
     it = it + 1;
+    i = i + 1;
+
     vidFrame = readFrame(video); %read video frame of pacmans, class: uint8
 %     video.CurrentTime
+%     if mod(i, 2) == 0
+%         continue; % lower frame rate
+%     end
+    
 
     histogram = color_histogram(vidFrame, params.pcm_colour);
+    mins = [mins min(min(histogram))];
+    maxs = [maxs max(max(histogram))];
     S_bar = pf_predict(S, params);
     [S_bar, weight_avg] = pf_weight(S_bar, params, histogram);
 
 
-    if it > warmup_it && weight_avg < 0.003
+    if it > warmup_it && weight_avg <= 0.003
         display('we think we are lost, inject at pacman color position')
 
         p = find_pacman_positions(vidFrame, params);
@@ -57,7 +89,7 @@ while hasFrame(video) && video.CurrentTime < stopTime
 
 
 %     subplot(1,2,1);
-    image(vidFrame,Parent=gca);
+%     image(vidFrame,Parent=gca);
 % 
 %     subplot(2,2,2);
 %     imshow(mat2gray(histogram),Parent=gca);
@@ -65,7 +97,8 @@ while hasFrame(video) && video.CurrentTime < stopTime
 %     subplot(2,2,3);
     imshow(vidFrame,Parent=gca)
     pos_estimate = plot_particles(S);
-    pos_groundtruth = plot_pacman_center(vidFrame, params);
+    pos_groundtruth = get_pacman_center(vidFrame, params);
+%     plot_pacman_center(vidFrame, params);
 
     time = [time video.CurrentTime];
     weight_avgs = [weight_avgs weight_avg];
@@ -76,13 +109,25 @@ while hasFrame(video) && video.CurrentTime < stopTime
     stddev = [std(S.X(1,:)); std(S.X(2,:))];
     particle_stddevs = [particle_stddevs stddev];
 
+    F = getframe(gcf);
+    writeVideo(video_writer,F); % Write the image to file.
+
 %     subplot(1,2,2);
+%     frame = vidFrame(params.bounds(1,1):params.bounds(1,2),params.bounds(2,1):params.bounds(2,2),:);
+%     dist_image = color_dist(frame, params.pcm_colour);
+%     bin_image = dist_image > params.cutoff_dist;
+%     imshow(mat2gray(histogram),Parent=gca);
 %     plot(avgs);
 
-    pause(0.1)
+%     pause(0.5)
 end
 
 pf_plot_stats(time,weight_avgs, pos_estimates, pos_groundtruths, pos_errs, particle_stddevs);
+
+fprintf('min is %0.4f\n', min(mins));
+fprintf('max is %0.4f\n', max(maxs));
+
+close(video_writer);
 
 function pos = getRandomPos(params, count)
     pos = [params.bounds(2,1) + (params.bounds(2,2) - params.bounds(2,1)) * rand(1, count);% colums
@@ -124,57 +169,6 @@ S_bar.W = S.W;
 % disp("pf_predict successful")
 end
 
-% % histogram 1080x1920
-% % S.W 1xM
-% % S.X 2x1000
-% function [S_bar, w_avg] = pf_weight(S, params, histogram)
-%     S_bar = S;
-%     x_coords = ceil(S_bar.X(1, :)) ; % 1x1000
-%     y_coords = ceil(S_bar.X(2, :)) ; % 1x1000
-% 
-% 
-%     for m=1:params.M
-%         x = x_coords(1,m);
-%         y = y_coords(1,m);
-% 
-%         if (x > params.bounds(2,2) || x <= params.bounds(2,1) || y > params.bounds(1,2) || y <= params.bounds(1,1))
-%             S_bar.W(m) = 0;
-%         else
-%             S_bar.W(m) = histogram(y, x);
-%         end
-%     end
-% 
-%     w_avg = mean(S_bar.W);
-% 
-%     % normalize weights
-%     S_bar.W = S_bar.W ./ sum(S_bar.W) ;
-% end
-
-% function S_bar = pf_weight(S_bar, params, histogram)
-% row = ceil(S_bar.X(1, :)) ;
-% col = ceil(S_bar.X(2, :)) ;
-% max_width =  params.state_space_bound(2) ;
-% max_height =  params.state_space_bound(1);
-% if any(col > max_width) || any(row > max_height)
-%     col(col>max_width) = max_width ; % columns/ width
-%     row(row> max_height) = max_height ; %rows / height
-% end
-% for i = 1:1:params.M
-% %     test1 = row(i);
-% %     test2 = col(i);
-%     try
-%         S_bar.W(1, i) = histogram(row(i), col(i));
-%     catch
-%         fprintf("\nindexing error \n m= %d\n row = %d\n col= %d\n", i, row, col)
-%         disp("error")
-%     end
-%     
-%     %normalize
-% end
-% S_bar.W = S_bar.W ./sum(S_bar.W) ;
-% % disp("pf_weight successful")
-% end
-
 
 function S = pf_sys_resamp(S_bar, params, random_particles)
     cdf = cumsum(S_bar.W);
@@ -184,6 +178,10 @@ function S = pf_sys_resamp(S_bar, params, random_particles)
     
     for m = 1 : M
         i = find(cdf >= r_0,1,'first');
+
+        if isempty(i) % this is weird, sometimes find fails
+            i = m;
+        end
     
         S.X(:,m) = S_bar.X(:,i);
         r_0 = r_0 + 1/M;
@@ -202,15 +200,15 @@ function S = pf_sys_resamp(S_bar, params, random_particles)
 
 end
 
-function S = multinomial_resample(S_bar, params)
-
-    cdf = cumsum(S_bar.W);
-    S.X = zeros(size(S_bar.X));
-
-    for m = 1 : params.M
-        rm = rand;
-        i = find(cdf >= rm,1,'first');
-        S.X(:,m) = S_bar.X(:,i);
-    end
-    S.W = 1/params.M*ones(1,params.M);
-end
+% function S = multinomial_resample(S_bar, params)
+% 
+%     cdf = cumsum(S_bar.W);
+%     S.X = zeros(size(S_bar.X));
+% 
+%     for m = 1 : params.M
+%         rm = rand;
+%         i = find(cdf >= rm,1,'first');
+%         S.X(:,m) = S_bar.X(:,i);
+%     end
+%     S.W = 1/params.M*ones(1,params.M);
+% end
